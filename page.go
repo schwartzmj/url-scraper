@@ -13,9 +13,12 @@ import (
 type Page struct {
 	Title      string
 	Url        string
+	Host 	 string
+	Path 	 string
+	Scheme 	 string
 	Links      []string
 	StatusCode int
-	Redirects  []string
+	Redirects  []string // eventually make this an array of Redirect struct itself (from, to, status code)?
 }
 
 type GetPageResult struct {
@@ -70,6 +73,9 @@ func get(url string) GetPageResult {
 		Page: Page{
 			Title:      doc.Find("title").Text(),
 			Url:        urlToGet,
+			Host :      resp.Request.URL.Host,
+			Path :      strings.TrimSuffix(resp.Request.URL.Path, "/"),
+			Scheme :    resp.Request.URL.Scheme,
 			Links:      links,
 			StatusCode: resp.StatusCode,
 			Redirects:  redirects,
