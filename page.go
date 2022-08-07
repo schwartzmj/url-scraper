@@ -12,7 +12,7 @@ import (
 
 type Page struct {
 	Title      string
-	Url		string
+	Url        string
 	Links      []string
 	StatusCode int
 	Redirects  []string
@@ -33,7 +33,7 @@ func get(url string) (Page, bool, error) {
 	client := &http.Client{
 		Timeout: time.Second * 10,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Push the upcoming redirect onto the redirects slice
+			// Push the upcoming redirect onto the redirects array
 			redirects = append(redirects, req.URL.String())
 			return nil
 		},
@@ -92,7 +92,7 @@ func normalizeLink(link string) (string, bool, error) {
 	// Remove any trailing slashes from the path to stay consistent
 	u.Path = strings.TrimSuffix(u.Path, "/")
 	// Remove any fragments from the path
-    u.Fragment = ""
+	u.Fragment = ""
 	// Remove any query params from the path
 	u.RawQuery = ""
 
