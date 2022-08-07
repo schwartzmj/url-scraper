@@ -32,7 +32,7 @@ type PagesMutex struct {
 
 var pagesMutex = PagesMutex{}
 
-var wg sync.WaitGroup
+var wg = sync.WaitGroup{}
 
 func main() {
 	start := time.Now()
@@ -73,6 +73,7 @@ func main() {
 }
 
 func crawl(url string) {
+	// Note we wg.Add(1) before the very first call of this function (done in main())
 	defer wg.Done()
 
 	getPageResult := get(url)
@@ -99,11 +100,6 @@ func crawl(url string) {
 	// For each getPageResult.Page.Links, call crawl on each link concurrently
 	for _, link := range getPageResult.Page.Links {
 		wg.Add(1)
-		ch := make(chan bool)
-		go func(link string) {
-			crawl(link)
-			ch <- true
-			wg.Done()
-		}(link)
+		go crawl(link)
 	}
 }
