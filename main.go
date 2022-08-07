@@ -54,13 +54,17 @@ func main() {
 
 	wg.Wait()
 
-	ex, err := os.Executable()
+	ex, err := os.Getwd()
     if err != nil {
         panic(err)
     }
 	file, _ := json.MarshalIndent(pagesMutex.pages, "", " ")
 	pathToSave := filepath.Join(filepath.Dir(ex), "pages.json")
-	_ = ioutil.WriteFile(pathToSave, file, 0644)
+	fmt.Println("Saving to:", pathToSave)
+	err = ioutil.WriteFile(pathToSave, file, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// fmt.Println("Pages Mutex: ", pagesMutex.pages)
 	fmt.Println("Number of pages visited: ", len(pagesMutex.pages))
