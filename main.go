@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -52,10 +54,15 @@ func main() {
 
 	wg.Wait()
 
+	ex, err := os.Executable()
+    if err != nil {
+        panic(err)
+    }
 	file, _ := json.MarshalIndent(pagesMutex.pages, "", " ")
-	_ = ioutil.WriteFile("pages.json", file, 0644)
+	pathToSave := filepath.Join(filepath.Dir(ex), "pages.json")
+	_ = ioutil.WriteFile(pathToSave, file, 0644)
 
-	fmt.Println("Pages Mutex: ", pagesMutex.pages)
+	// fmt.Println("Pages Mutex: ", pagesMutex.pages)
 	fmt.Println("Number of pages visited: ", len(pagesMutex.pages))
 	fmt.Println("Done.")
 }
