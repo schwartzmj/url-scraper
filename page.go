@@ -18,14 +18,20 @@ type Page struct {
 	Redirects  []string
 }
 
+type GetPageResult struct {
+	Page    Page
+	Skipped bool
+	Err     error
+}
+
 // get makes an HTTP GET request to the specified URL and returns a Page struct and a boolean indicating whether the page was skipped.
-func get(url string) (Page, bool, error) {
+func get(url string) GetPageResult {
 	urlToGet, shouldSkip, err := normalizeLink(url)
 	if err != nil {
-		return Page{}, false, err
+		return GetPageResult{Err: err}
 	}
 	if shouldSkip {
-		return Page{}, true, nil
+		return GetPageResult{Skipped: true}
 	}
 
 	var redirects []string
@@ -41,30 +47,34 @@ func get(url string) (Page, bool, error) {
 
 	req, err := http.NewRequest("GET", urlToGet, nil)
 	if err != nil {
-		return Page{}, false, err
+		return GetPageResult{Err: err}
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36")
+
 	resp, err := client.Do(req)
 	if err != nil {
-		return Page{}, false, err
+		return GetPageResult{Err: err}
+
 	}
 	defer resp.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return Page{}, false, err
+		return GetPageResult{Err: err}
 	}
 
 	fmt.Println("Successfully crawled: ", urlToGet, " Status code: ", resp.StatusCode)
 
 	links := getLinks(doc)
-	return Page{
-		Title:      doc.Find("title").Text(),
-		Url:        urlToGet,
-		Links:      links,
-		StatusCode: resp.StatusCode,
-		Redirects:  redirects,
-	}, false, nil
+	return GetPageResult{
+		Page: Page{
+			Title:      doc.Find("title").Text(),
+			Url:        urlToGet,
+			Links:      links,
+			StatusCode: resp.StatusCode,
+			Redirects:  redirects,
+		},
+	}
 }
 
 // getLinks gets all links from the page and return a slice of strings
@@ -79,8 +89,10 @@ func getLinks(doc *goquery.Document) []string {
 
 // normalizeLink takes a link and returns a normalized link and a boolean indicating whether the link should be skipped. It also takes care of adding to the urlsHandled map.
 func normalizeLink(link string) (string, bool, error) {
+	urlsHandledMutex.mu.Lock()
+	defer urlsHandledMutex.mu.Unlock()
 	// Return early if we've already handled the non-normalized link
-	if urlsHandled[link] {
+	if urlsHandledMutex.urls[link] {
 		return "", true, nil
 	}
 
@@ -97,7 +109,7 @@ func normalizeLink(link string) (string, bool, error) {
 	u.RawQuery = ""
 
 	// Now that we've normalized the link without fragments, query params, and trailing slashes check if we've already handled it
-	if urlsHandled[u.String()] {
+	if urlsHandledMutex.urls[u.String()] {
 		return "", true, nil
 	}
 
@@ -107,20 +119,20 @@ func normalizeLink(link string) (string, bool, error) {
 	}
 	// If the host is not initialHost, then it is external to the site and we should ignore it
 	if u.Host != initialHost {
-		urlsHandled[u.String()] = true
+		urlsHandledMutex.urls[u.String()] = true
 		return "", true, nil
 	}
 
 	u.Scheme = initialScheme
 
 	// Fully normalized link with scheme and host. We check once more if we've already handled it.
-	if urlsHandled[u.String()] {
+	if urlsHandledMutex.urls[u.String()] {
 		return "", true, nil
 	}
 	// Set the normalized link as handled
-	urlsHandled[u.String()] = true
+	urlsHandledMutex.urls[u.String()] = true
 	// Set the initial, unnormalized link as handled
-	urlsHandled[link] = true
+	urlsHandledMutex.urls[link] = true
 
 	return u.String(), false, nil
 }

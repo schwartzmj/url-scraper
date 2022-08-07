@@ -7,18 +7,38 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
+	"time"
 )
 
 var initialScheme string
 var initialHost string
 var initialPath string
 
-var urlsHandled = make(map[string]bool)
+// make a urlsHandled syncmap
+var urlsHandledMutex = UrlsHandledMutex{urls: make(map[string]bool)}
 
-var pages = []Page{}
+type UrlsHandledMutex struct {
+	mu   sync.Mutex
+	urls map[string]bool
+}
+
+type PagesMutex struct {
+	mu    sync.Mutex
+	pages []Page
+}
+
+var pagesMutex = PagesMutex{}
+
+var wg sync.WaitGroup
 
 func main() {
-	baseUrl := "https://www.damselsbd.com/"
+	start := time.Now()
+	defer func() {
+		fmt.Println("Time taken:", time.Since(start))
+	}()
+
+	baseUrl := "https://www.wemaketechsimple.com/"
 	u, err := url.Parse(baseUrl)
 	if err != nil {
 		log.Fatal(err)
@@ -27,40 +47,49 @@ func main() {
 	initialHost = u.Host
 	initialPath = u.Path
 
-	// normalizedUrl, err := normalizeLink(baseUrl)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
+	// Initiate recursive crawl
 	crawl(u.String())
 
-	file, _ := json.MarshalIndent(pages, "", " ")
+	wg.Wait()
+
+	file, _ := json.MarshalIndent(pagesMutex.pages, "", " ")
 	_ = ioutil.WriteFile("pages.json", file, 0644)
 
-	fmt.Println("Number of pages visited: ", len(pages))
-	fmt.Println("Done!")
+	fmt.Println("Pages Mutex: ", pagesMutex.pages)
+	fmt.Println("Number of pages visited: ", len(pagesMutex.pages))
+	fmt.Println("Done.")
 }
 
 func crawl(url string) {
-	page, skipped, err := get(url)
-	if err != nil {
-		fmt.Println(err)
+	wg.Add(1)
+	defer wg.Done()
+
+	getPageResult := get(url)
+
+	if getPageResult.Err != nil {
+		fmt.Println(getPageResult.Err)
 		return
 	}
 	// if page is empty, then we have already visited this page and we should return
-	if skipped {
+	if getPageResult.Skipped {
 		return
 	}
 
 	// add the page to the pages slice
-	pages = append(pages, page)
+	pagesMutex.mu.Lock()
+	pagesMutex.pages = append(pagesMutex.pages, getPageResult.Page)
+	pagesMutex.mu.Unlock()
 
-	if page.StatusCode != http.StatusOK {
-		fmt.Println("Error. Status code:", page.StatusCode)
+	if getPageResult.Page.StatusCode != http.StatusOK {
+		fmt.Println("Error. Status code:", getPageResult.Page.StatusCode)
 		return
 	}
-
-	for _, link := range page.Links {
-		crawl(link)
+	// For each getPageResult.Page.Links, call crawl on each link concurrently
+	for _, link := range getPageResult.Page.Links {
+		ch := make(chan bool)
+		go func(link string) {
+			crawl(link)
+			ch <- true
+		}(link)
 	}
 }
