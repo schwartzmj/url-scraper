@@ -50,6 +50,7 @@ func main() {
 	initialPath = u.Path
 
 	// Initiate recursive crawl
+	wg.Add(1)
 	crawl(u.String())
 
 	wg.Wait()
@@ -72,7 +73,6 @@ func main() {
 }
 
 func crawl(url string) {
-	wg.Add(1)
 	defer wg.Done()
 
 	getPageResult := get(url)
@@ -95,12 +95,15 @@ func crawl(url string) {
 		fmt.Println("Error. Status code:", getPageResult.Page.StatusCode)
 		return
 	}
+
 	// For each getPageResult.Page.Links, call crawl on each link concurrently
 	for _, link := range getPageResult.Page.Links {
+		wg.Add(1)
 		ch := make(chan bool)
 		go func(link string) {
 			crawl(link)
 			ch <- true
+			wg.Done()
 		}(link)
 	}
 }
