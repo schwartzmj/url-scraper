@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,12 +14,20 @@ import (
 type Page struct {
 	Title      string
 	Url        string
-	Host 	 string
-	Path 	 string
-	Scheme 	 string
+	Host       string
+	Path       string
+	Scheme     string
 	Links      []string
 	StatusCode int
 	Redirects  []string // eventually make this an array of Redirect struct itself (from, to, status code)?
+}
+
+type NormalizedLinkResult struct {
+	Link string
+	IsAlias bool
+	Skip bool
+	NonRelative bool
+	Err  error
 }
 
 type GetPageResult struct {
@@ -29,11 +38,12 @@ type GetPageResult struct {
 
 // get makes an HTTP GET request to the specified URL and returns a Page struct and a boolean indicating whether the page was skipped.
 func get(url string) GetPageResult {
-	urlToGet, shouldSkip, err := normalizeLink(url)
-	if err != nil {
-		return GetPageResult{Err: err}
+	normalizedLinkResult := normalizeLink(url)
+	// fmt.Println(urlsHandledMutex.urls, normalizedLinkResult.Link)
+	if normalizedLinkResult.Err != nil {
+		return GetPageResult{Err: normalizedLinkResult.Err}
 	}
-	if shouldSkip {
+	if normalizedLinkResult.Skip {
 		return GetPageResult{Skipped: true}
 	}
 
@@ -48,7 +58,7 @@ func get(url string) GetPageResult {
 		},
 	}
 
-	req, err := http.NewRequest("GET", urlToGet, nil)
+	req, err := http.NewRequest("GET", normalizedLinkResult.Link, nil)
 	if err != nil {
 		return GetPageResult{Err: err}
 	}
@@ -61,23 +71,49 @@ func get(url string) GetPageResult {
 
 	}
 	defer resp.Body.Close()
+
+	var statusCode int
+	if len(redirects) > 0 {
+		statusCode = http.StatusMultipleChoices
+	} else {
+		statusCode = resp.StatusCode
+	}
+
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return GetPageResult{Err: err}
 	}
 
-	fmt.Println("Successfully crawled: ", urlToGet, " Status code: ", resp.StatusCode)
+	// Switch resp.StatusCode. fmt.Println in colorGreen if it is 200, in colorYellow if it is 300, and in colorRed if it is anything else.
+	var statusCodeText string
+	var hostText = resp.Request.URL.Host
+
+	switch statusCode {
+	case http.StatusOK:
+ 		statusCodeText += "\033[32m" + strconv.Itoa(statusCode) + "\033[0m"
+	case http.StatusMultipleChoices:
+ 		statusCodeText += "\033[33m" + strconv.Itoa(statusCode) + "\033[0m"
+	default:
+ 		statusCodeText += "\033[31m" + strconv.Itoa(statusCode) + "\033[0m"
+	}
+	if normalizedLinkResult.IsAlias {
+		hostText += " \033[33m" + "(alias)" +"\033[0m"
+	}
+	if normalizedLinkResult.NonRelative {
+		hostText += " \033[31m" + "(non-relative)" +"\033[0m"
+	}
+	fmt.Println(statusCodeText, strings.TrimSuffix(resp.Request.URL.Path, "/"), hostText)
 
 	links := getLinks(doc)
 	return GetPageResult{
 		Page: Page{
 			Title:      doc.Find("title").Text(),
-			Url:        urlToGet,
-			Host :      resp.Request.URL.Host,
-			Path :      strings.TrimSuffix(resp.Request.URL.Path, "/"),
-			Scheme :    resp.Request.URL.Scheme,
+			Url:        normalizedLinkResult.Link,
+			Host:       resp.Request.URL.Host,
+			Path:       strings.TrimSuffix(resp.Request.URL.Path, "/"),
+			Scheme:     resp.Request.URL.Scheme,
 			Links:      links,
-			StatusCode: resp.StatusCode,
+			StatusCode: statusCode,
 			Redirects:  redirects,
 		},
 	}
@@ -93,22 +129,40 @@ func getLinks(doc *goquery.Document) []string {
 	return links
 }
 
+func getHostAlias(host string) string {
+	// If host starts with www., return the host without the www.
+	// If host does not start with www., return the host with www.
+	if host[:4] == "www." {
+		return host[4:]
+	}
+	return "www." + host
+}
+
 // normalizeLink takes a link and returns a normalized link and a boolean indicating whether the link should be skipped. It also takes care of adding to the urlsHandled map.
-func normalizeLink(link string) (string, bool, error) {
+func normalizeLink(link string) NormalizedLinkResult {
+	normalizedLink := NormalizedLinkResult{}
+
 	urlsHandledMutex.mu.Lock()
 	defer urlsHandledMutex.mu.Unlock()
 	// Return early if we've already handled the non-normalized link
 	if urlsHandledMutex.urls[link] {
-		return "", true, nil
+		normalizedLink.Skip = true
+		return normalizedLink
 	}
 
 	u, err := url.Parse(link)
 	if err != nil {
-		return "", false, err
+		normalizedLink.Err = err
+		return normalizedLink
 	}
 
 	// Remove any trailing slashes from the path to stay consistent
 	u.Path = strings.TrimSuffix(u.Path, "/")
+	// Now that we've normalized the path, we can check if we've visited this path before.
+	if (urlsHandledMutex.urls[u.Path]) {
+		normalizedLink.Skip = true
+		return normalizedLink
+	}
 	// Remove any fragments from the path
 	u.Fragment = ""
 	// Remove any query params from the path
@@ -116,31 +170,44 @@ func normalizeLink(link string) (string, bool, error) {
 
 	// Now that we've normalized the link without fragments, query params, and trailing slashes check if we've already handled it
 	if urlsHandledMutex.urls[u.String()] {
-		return "", true, nil
+		normalizedLink.Skip = true
+		return normalizedLink
 	}
 
 	// If the URL is not absolute, then we need to add the initialHost to it
 	if !u.IsAbs() {
 		u.Host = initialHost
+		normalizedLink.NonRelative = true
 	}
-	// If the host is not initialHost, then it is external to the site and we should ignore it
 	if u.Host != initialHost {
-		urlsHandledMutex.urls[u.String()] = true
-		return "", true, nil
+		if getHostAlias(initialHost) == u.Host {
+			// this is an alias (www. or root domain depending on our initialHost) so we should try it
+			normalizedLink.IsAlias = true
+		} else {
+			// If the host is not initialHost nor an alias, then it is external to the site and we should ignore it
+			urlsHandledMutex.urls[u.String()] = true
+			normalizedLink.Skip = true
+			return normalizedLink
+		}
 	}
 
 	u.Scheme = initialScheme
 
 	// Fully normalized link with scheme and host. We check once more if we've already handled it.
 	if urlsHandledMutex.urls[u.String()] {
-		return "", true, nil
+		normalizedLink.Skip = true
+		return normalizedLink
 	}
 	// Set the normalized link as handled
 	urlsHandledMutex.urls[u.String()] = true
+	// Set the Path as handled (TODO: should we just be doing this instead of u.String()?)
+	urlsHandledMutex.urls[u.Path] = true
 	// Set the initial, unnormalized link as handled
 	urlsHandledMutex.urls[link] = true
 
-	return u.String(), false, nil
+	normalizedLink.Link = u.String()
+	return normalizedLink
+
 }
 
 // func normalizeAndValidateLink(link string) (string, error) {

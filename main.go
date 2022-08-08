@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -40,7 +39,7 @@ func main() {
 		fmt.Println("Time taken:", time.Since(start))
 	}()
 
-	baseUrl := "https://www.wemaketechsimple.com/"
+	baseUrl := "https:/www.wemaketechsimple.com/"
 	u, err := url.Parse(baseUrl)
 	if err != nil {
 		log.Fatal(err)
@@ -56,9 +55,9 @@ func main() {
 	wg.Wait()
 
 	ex, err := os.Getwd()
-    if err != nil {
-        panic(err)
-    }
+	if err != nil {
+		panic(err)
+	}
 	file, _ := json.MarshalIndent(pagesMutex.pages, "", " ")
 	pathToSave := filepath.Join(filepath.Dir(ex), "pages.json")
 	fmt.Println("Saving to:", pathToSave)
@@ -92,10 +91,10 @@ func crawl(url string) {
 	pagesMutex.pages = append(pagesMutex.pages, getPageResult.Page)
 	pagesMutex.mu.Unlock()
 
-	if getPageResult.Page.StatusCode != http.StatusOK {
-		fmt.Println("Error. Status code:", getPageResult.Page.StatusCode)
-		return
-	}
+	// if getPageResult.Page.StatusCode != http.StatusOK ||  {
+	// 	fmt.Println("Error. Status code:", getPageResult.Page.StatusCode)
+	// 	return
+	// }
 
 	// For each getPageResult.Page.Links, call crawl on each link concurrently
 	for _, link := range getPageResult.Page.Links {
