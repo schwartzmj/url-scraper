@@ -39,6 +39,7 @@ type GetPageResult struct {
 // get makes an HTTP GET request to the specified URL and returns a Page struct and a boolean indicating whether the page was skipped.
 func get(url string) GetPageResult {
 	normalizedLinkResult := normalizeLink(url)
+
 	// fmt.Println(urlsHandledMutex.urls, normalizedLinkResult.Link)
 	if normalizedLinkResult.Err != nil {
 		return GetPageResult{Err: normalizedLinkResult.Err}
@@ -116,7 +117,7 @@ func get(url string) GetPageResult {
 			Title:      doc.Find("title").Text(),
 			Url:        normalizedLinkResult.Link,
 			Host:       resp.Request.URL.Host,
-			Path:       strings.TrimSuffix(resp.Request.URL.Path, "/"),
+			Path:       resp.Request.URL.Path,
 			Scheme:     resp.Request.URL.Scheme,
 			Links:      links,
 			StatusCode: statusCode,
@@ -162,14 +163,17 @@ func normalizeLink(link string) NormalizedLinkResult {
 		return normalizedLink
 	}
 
-	u.Scheme = initialScheme
 	// Remove any fragments from the path
 	u.Fragment = ""
 	// Remove any query params from the path
 	u.RawQuery = ""
 
-	// Now that we've parsed the url, check if we've visited the path.
-	if (urlsHandledMutex.urls[u.Path]) {
+	// Now that we've parsed the url, check if we've visited the path. We have to check both / and non-/ paths.
+	// TODO: I think we can add a custom function to the struct to do this logic?
+	// We use this temporaryCheck variable at the end of this function too.
+	noTrailingSlashPath := u.Path
+	noTrailingSlashPath = strings.TrimSuffix(noTrailingSlashPath, "/")
+	if urlsHandledMutex.urls[noTrailingSlashPath] || urlsHandledMutex.urls[noTrailingSlashPath+"/"] {
 		normalizedLink.Skip = true
 		return normalizedLink
 	}
@@ -181,17 +185,23 @@ func normalizeLink(link string) NormalizedLinkResult {
 	// }
 
 	// If the URL is not absolute, then we need to add the initialHost to it
-	if !u.IsAbs() {
+	// If the URL is absolute (it has a scheme), then we mark it non-relative for informational purposes.
+	if u.Host=="" {
 		u.Host = initialHost
+	} else if len(urlsHandledMutex.urls) == 0 {
+		// this is initial crawl, so we will not mark it non-relative since it is the full url
+	} else {
 		normalizedLink.NonRelative = true
 	}
+
+	// Now that we've added a host to all relative links, we can confirm that the link is an internal link.
 	if u.Host != initialHost {
+		// Check if the link is an alias (www. or root domain depending on our initialHost). If so, consider it valid, but mark it as an alias.
 		if getHostAlias(initialHost) == u.Host {
-			// this is an alias (www. or root domain depending on our initialHost) so we should try it
 			normalizedLink.IsAlias = true
 		} else {
-			// If the host is not initialHost nor an alias, then it is external to the site and we should ignore it
-			urlsHandledMutex.urls[u.String()] = true
+			// If the host is not initialHost nor an alias, then it is external to the site and we should ignore it.
+			urlsHandledMutex.urls[link] = true
 			normalizedLink.Skip = true
 			return normalizedLink
 		}
@@ -199,26 +209,22 @@ func normalizeLink(link string) NormalizedLinkResult {
 
 
 	// Fully normalized link with scheme and host. We check once more if we've already handled it.
-	if urlsHandledMutex.urls[u.String()] {
-		normalizedLink.Skip = true
-		return normalizedLink
-	}
+	// if urlsHandledMutex.urls[u.String()] {
+	// 	normalizedLink.Skip = true
+	// 	return normalizedLink
+	// }
 	// Set the normalized link as handled
 	// urlsHandledMutex.urls[u.String()] = true
 	// Set the Path as handled (TODO: should we just be doing this instead of u.String()?)
-	urlsHandledMutex.urls[u.Path] = true
+	// urlsHandledMutex.urls[u.Path] = true
+
 	// Set the initial, unnormalized link as handled so we can break early out of this function in the future.
 	urlsHandledMutex.urls[link] = true
-
 	// Add the path to our handled list. Add both trailing slash and non-trailing slash. This is our primary check alongside the un-normalized link.
-	if (strings.HasSuffix(u.Path, "/")) {
-		urlsHandledMutex.urls[u.Path] = true
-		urlsHandledMutex.urls[strings.TrimSuffix(u.Path, "/")] = true
-	} else {
-		urlsHandledMutex.urls[u.Path] = true
-		urlsHandledMutex.urls[u.Path + "/"] = true
-	}
+	urlsHandledMutex.urls[noTrailingSlashPath] = true
+	urlsHandledMutex.urls[noTrailingSlashPath+"/"] = true
 
+	u.Scheme = initialScheme // set the scheme to the initial scheme (if it started relative it would just be host+path without https/http)
 	normalizedLink.Link = u.String()
 	return normalizedLink
 
