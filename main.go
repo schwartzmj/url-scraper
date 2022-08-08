@@ -36,7 +36,7 @@ var wg = sync.WaitGroup{}
 func main() {
 	start := time.Now()
 	defer func() {
-		fmt.Println("Time taken:", time.Since(start))
+		fmt.Println("Time taken total:", time.Since(start))
 	}()
 
 	baseUrl := "https://www.wemaketechsimple.com/"
@@ -51,6 +51,10 @@ func main() {
 	// Initiate recursive crawl
 	wg.Add(1)
 	crawl(u.String())
+	firstPageCrawledTime := time.Now()
+	defer func() {
+		fmt.Println("Time taken after first page:", time.Since(firstPageCrawledTime))
+	}()
 
 	wg.Wait()
 
