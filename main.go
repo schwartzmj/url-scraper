@@ -6,8 +6,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
-	"os"
+	"path"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -39,7 +40,7 @@ func main() {
 		fmt.Println("Time taken:", time.Since(start))
 	}()
 
-	baseUrl := "https:/www.wemaketechsimple.com/"
+	baseUrl := "https://www.wemaketechsimple.com/"
 	u, err := url.Parse(baseUrl)
 	if err != nil {
 		log.Fatal(err)
@@ -54,12 +55,13 @@ func main() {
 
 	wg.Wait()
 
-	ex, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
 	file, _ := json.MarshalIndent(pagesMutex.pages, "", " ")
-	pathToSave := filepath.Join(filepath.Dir(ex), "pages.json")
+
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("No caller information")
+	}
+	pathToSave := filepath.Join(path.Dir(filename), "pages.json")
 	fmt.Println("Saving to:", pathToSave)
 	err = ioutil.WriteFile(pathToSave, file, 0644)
 	if err != nil {

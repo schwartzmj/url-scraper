@@ -19,7 +19,7 @@ type Page struct {
 	Scheme     string
 	Links      []string
 	StatusCode int
-	Redirects  []string // eventually make this an array of Redirect struct itself (from, to, status code)?
+	Redirected  bool // eventually make this an array of Redirect struct itself (from, to, status code)?
 }
 
 type NormalizedLinkResult struct {
@@ -47,13 +47,12 @@ func get(url string) GetPageResult {
 		return GetPageResult{Skipped: true}
 	}
 
-	var redirects []string
+	var hasRedirect bool
 
 	client := &http.Client{
 		Timeout: time.Second * 10,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Push the upcoming redirect onto the redirects array
-			redirects = append(redirects, req.URL.String())
+			hasRedirect = true
 			return nil
 		},
 	}
@@ -73,11 +72,11 @@ func get(url string) GetPageResult {
 	defer resp.Body.Close()
 
 	var statusCode int
-	if len(redirects) > 0 {
-		statusCode = http.StatusMultipleChoices
-	} else {
-		statusCode = resp.StatusCode
-	}
+	// if len(redirects) > 0 {
+	// 	statusCode = http.StatusMultipleChoices
+	// } else {
+	// 	statusCode = resp.StatusCode
+	// }
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
@@ -87,6 +86,12 @@ func get(url string) GetPageResult {
 	// Switch resp.StatusCode. fmt.Println in colorGreen if it is 200, in colorYellow if it is 300, and in colorRed if it is anything else.
 	var statusCodeText string
 	var hostText = resp.Request.URL.Host
+
+	if hasRedirect {
+		statusCode = 300
+	} else {
+		statusCode = resp.StatusCode
+	}
 
 	switch statusCode {
 	case http.StatusOK:
@@ -114,7 +119,7 @@ func get(url string) GetPageResult {
 			Scheme:     resp.Request.URL.Scheme,
 			Links:      links,
 			StatusCode: statusCode,
-			Redirects:  redirects,
+			Redirected:  hasRedirect,
 		},
 	}
 }
