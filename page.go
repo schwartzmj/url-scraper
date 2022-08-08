@@ -19,7 +19,7 @@ type Page struct {
 	Scheme     string
 	Links      []string
 	StatusCode int
-	Redirected  bool // eventually make this an array of Redirect struct itself (from, to, status code)?
+	Redirects  []string // eventually make this an array of Redirect struct itself (from, to, status code)?
 }
 
 type NormalizedLinkResult struct {
@@ -47,12 +47,12 @@ func get(url string) GetPageResult {
 		return GetPageResult{Skipped: true}
 	}
 
-	var hasRedirect bool
+	var redirects []string
 
 	client := &http.Client{
 		Timeout: time.Second * 10,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			hasRedirect = true
+			redirects = append(redirects, req.URL.String())
 			return nil
 		},
 	}
@@ -85,9 +85,8 @@ func get(url string) GetPageResult {
 
 	// Switch resp.StatusCode. fmt.Println in colorGreen if it is 200, in colorYellow if it is 300, and in colorRed if it is anything else.
 	var statusCodeText string
-	var hostText = resp.Request.URL.Host
 
-	if hasRedirect {
+	if len(redirects) > 0 {
 		statusCode = 300
 	} else {
 		statusCode = resp.StatusCode
@@ -101,13 +100,15 @@ func get(url string) GetPageResult {
 	default:
  		statusCodeText += "\033[31m" + strconv.Itoa(statusCode) + "\033[0m"
 	}
+
+	var otherNotesText string
 	if normalizedLinkResult.IsAlias {
-		hostText += " \033[33m" + "(alias)" +"\033[0m"
+		otherNotesText += " \033[33m" + "(alias)" +"\033[0m"
 	}
 	if normalizedLinkResult.NonRelative {
-		hostText += " \033[31m" + "(non-relative)" +"\033[0m"
+		otherNotesText += " \033[31m" + "(non-relative)" +"\033[0m"
 	}
-	fmt.Println(statusCodeText, strings.TrimSuffix(resp.Request.URL.Path, "/"), hostText)
+	fmt.Println(statusCodeText, resp.Request.URL.Path, otherNotesText)
 
 	links := getLinks(doc)
 	return GetPageResult{
@@ -119,7 +120,7 @@ func get(url string) GetPageResult {
 			Scheme:     resp.Request.URL.Scheme,
 			Links:      links,
 			StatusCode: statusCode,
-			Redirected:  hasRedirect,
+			Redirects:  redirects,
 		},
 	}
 }
@@ -161,23 +162,23 @@ func normalizeLink(link string) NormalizedLinkResult {
 		return normalizedLink
 	}
 
-	// Remove any trailing slashes from the path to stay consistent
-	u.Path = strings.TrimSuffix(u.Path, "/")
-	// Now that we've normalized the path, we can check if we've visited this path before.
-	if (urlsHandledMutex.urls[u.Path]) {
-		normalizedLink.Skip = true
-		return normalizedLink
-	}
+	u.Scheme = initialScheme
 	// Remove any fragments from the path
 	u.Fragment = ""
 	// Remove any query params from the path
 	u.RawQuery = ""
 
-	// Now that we've normalized the link without fragments, query params, and trailing slashes check if we've already handled it
-	if urlsHandledMutex.urls[u.String()] {
+	// Now that we've parsed the url, check if we've visited the path.
+	if (urlsHandledMutex.urls[u.Path]) {
 		normalizedLink.Skip = true
 		return normalizedLink
 	}
+
+	// Now that we've normalized the link without fragments, query params check if we've already handled it
+	// if urlsHandledMutex.urls[u.String()] {
+	// 	normalizedLink.Skip = true
+	// 	return normalizedLink
+	// }
 
 	// If the URL is not absolute, then we need to add the initialHost to it
 	if !u.IsAbs() {
@@ -196,7 +197,6 @@ func normalizeLink(link string) NormalizedLinkResult {
 		}
 	}
 
-	u.Scheme = initialScheme
 
 	// Fully normalized link with scheme and host. We check once more if we've already handled it.
 	if urlsHandledMutex.urls[u.String()] {
@@ -204,11 +204,20 @@ func normalizeLink(link string) NormalizedLinkResult {
 		return normalizedLink
 	}
 	// Set the normalized link as handled
-	urlsHandledMutex.urls[u.String()] = true
+	// urlsHandledMutex.urls[u.String()] = true
 	// Set the Path as handled (TODO: should we just be doing this instead of u.String()?)
 	urlsHandledMutex.urls[u.Path] = true
-	// Set the initial, unnormalized link as handled
+	// Set the initial, unnormalized link as handled so we can break early out of this function in the future.
 	urlsHandledMutex.urls[link] = true
+
+	// Add the path to our handled list. Add both trailing slash and non-trailing slash. This is our primary check alongside the un-normalized link.
+	if (strings.HasSuffix(u.Path, "/")) {
+		urlsHandledMutex.urls[u.Path] = true
+		urlsHandledMutex.urls[strings.TrimSuffix(u.Path, "/")] = true
+	} else {
+		urlsHandledMutex.urls[u.Path] = true
+		urlsHandledMutex.urls[u.Path + "/"] = true
+	}
 
 	normalizedLink.Link = u.String()
 	return normalizedLink

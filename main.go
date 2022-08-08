@@ -6,9 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
-	"path"
+	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -57,20 +56,22 @@ func main() {
 
 	file, _ := json.MarshalIndent(pagesMutex.pages, "", " ")
 
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("No caller information")
+	ex, err := os.Getwd()
+	if err != nil {
+		panic(err)
 	}
-	pathToSave := filepath.Join(path.Dir(filename), "pages.json")
-	fmt.Println("Saving to:", pathToSave)
+
+	pathToSave := filepath.Join(filepath.Dir(ex), "pages.json")
 	err = ioutil.WriteFile(pathToSave, file, 0644)
+
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// fmt.Println("Pages Mutex: ", pagesMutex.pages)
-	fmt.Println("Number of pages visited: ", len(pagesMutex.pages))
-	fmt.Println("Done.")
+	fmt.Println("\033[32m" + "---------------" + "\033[0m")
+	fmt.Println("Completed! Number of pages visited: ", len(pagesMutex.pages))
+	fmt.Println("Saved to:", pathToSave)
+	fmt.Println("\033[32m" + "---------------" + "\033[0m")
 }
 
 func crawl(url string) {
