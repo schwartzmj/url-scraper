@@ -191,6 +191,7 @@ func normalizeLink(link string) NormalizedLinkResult {
 	} else if len(urlsHandledMutex.urls) == 0 {
 		// this is initial crawl, so we will not mark it non-relative since it is the full url
 	} else {
+		// NOTE: marking non-relative isnt all that helpful considering it is only the first time we visit the link. would be more helpful to find all links on the site that arent relative instead of just this one instance
 		normalizedLink.NonRelative = true
 	}
 
