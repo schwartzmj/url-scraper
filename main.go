@@ -52,21 +52,16 @@ func main() {
 	}
 
 	if (len(baseUrl.String()) == 0) {
-		fmt.Println("Please provide a base URL to crawl")
-		os.Exit(1)
+		log.Fatal("Please provide a base URL to crawl")
 	}
 
-	u, err := url.Parse(baseUrl.String())
-	if err != nil {
-		log.Fatal(err)
-	}
-	initialScheme = u.Scheme
-	initialHost = u.Host
-	initialPath = u.Path
+	initialScheme = baseUrl.Scheme
+	initialHost = baseUrl.Host
+	initialPath = baseUrl.Path
 
 	// Initiate recursive crawl
 	wg.Add(1)
-	crawl(u.String())
+	crawl(baseUrl.String())
 	firstPageCrawledTime := time.Now()
 	defer func() {
 		fmt.Println("Time taken after first page:", time.Since(firstPageCrawledTime))
