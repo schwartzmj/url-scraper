@@ -46,11 +46,9 @@ func main() {
 	baseUrl, err := url.Parse(*baseUrlPtr)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(1)
 	}
 	if !baseUrl.IsAbs() {
 		log.Fatal("Base URL must be absolute")
-		os.Exit(1)
 	}
 
 	if (len(baseUrl.String()) == 0) {
