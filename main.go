@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -39,8 +40,25 @@ func main() {
 		fmt.Println("Time taken total:", time.Since(start))
 	}()
 
-	baseUrl := "https://www.wemaketechsimple.com/"
-	u, err := url.Parse(baseUrl)
+	baseUrlPtr := flag.String("url", "", "Base URL to crawl")
+	flag.Parse()
+
+	baseUrl, err := url.Parse(*baseUrlPtr)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+	if !baseUrl.IsAbs() {
+		log.Fatal("Base URL must be absolute")
+		os.Exit(1)
+	}
+
+	if (len(baseUrl.String()) == 0) {
+		fmt.Println("Please provide a base URL to crawl")
+		os.Exit(1)
+	}
+
+	u, err := url.Parse(baseUrl.String())
 	if err != nil {
 		log.Fatal(err)
 	}
