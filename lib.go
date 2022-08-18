@@ -93,9 +93,10 @@ func getAndCrawlHref(href string) {
 }
 
 type AnchorTag struct {
-	HrefValue  string
-	HrefExists bool
-	FoundOn    string
+	HrefValue                   string
+	HrefExists                  bool
+	InnerTextForNonExistentHref string
+	FoundOn                     string
 }
 
 // getLinks gets all anchor tag hrefs from the page and returns an array of each href value
@@ -103,7 +104,14 @@ func getAnchorTagsAndHrefAttribute(doc *goquery.Document, currentUrl string) []A
 	var anchorTags []AnchorTag
 	doc.Find("a").Each(func(i int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
-		anchorTags = append(anchorTags, AnchorTag{HrefValue: href, HrefExists: exists, FoundOn: currentUrl})
+
+		innerText := ""
+		if !exists {
+			// get the inner text for the anchor tag if it doesn't have an href attribute, so user can find it easier
+			innerText = strings.TrimSpace(s.Text())
+		}
+
+		anchorTags = append(anchorTags, AnchorTag{HrefValue: href, HrefExists: exists, InnerTextForNonExistentHref: innerText, FoundOn: currentUrl})
 	})
 	return anchorTags
 }
