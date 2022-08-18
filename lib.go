@@ -85,7 +85,7 @@ func getAndCrawlHref(href string) {
 	fmt.Println(resp.StatusCode, resp.Request.URL.String())
 	color.Unset()
 
-	anchorTags := getAnchorTagsAndHrefAttribute(doc, href)
+	anchorTags := getAnchorTagsAndHrefAttribute(doc, resp.Request.URL.String())
 
 	handleHrefs(anchorTags)
 	// TODO: why can I not use defer at the top? Seems like resp.Body does not exist anymore if I use defer at the top.

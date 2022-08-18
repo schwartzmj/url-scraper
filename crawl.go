@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/fatih/color"
+	"log"
 	"net/url"
 	"strings"
 	"sync"
@@ -10,15 +11,30 @@ import (
 
 var wg = sync.WaitGroup{}
 
-func initiateCrawl(url string) {
-	getAndCrawlHref(url)
+func initiateCrawl(u string) {
+	baseUrl, err := url.Parse(u)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Mark absolute base path as handled
+	markHrefAsHandled(baseUrl)
+
+	// Mark the root path as handled if the given baseUrl is the home page
+	if baseUrl.Path == "/" || baseUrl.Path == "" {
+		rootSlashPath, err := url.Parse("/")
+		if err != nil {
+			log.Fatal(err)
+		}
+		markHrefAsHandled(rootSlashPath)
+	}
+
+	getAndCrawlHref(baseUrl.String())
 }
 
 func handleHrefs(hrefs []AnchorTag) {
 
 	// loop through and handle all links, mark them internal/external/whatever else
 	for _, href := range hrefs {
-
 		if !href.HrefExists {
 			handleHrefDoesNotExist(href)
 			continue
@@ -82,7 +98,6 @@ func markHrefAsHandled(u *url.URL) bool {
 		urlsHandledMutex.urls[u.String()] = timesSeen + 1
 		return true
 	}
-
 	urlsHandledMutex.urls[u.String()] = 1
 	return false
 }
@@ -91,7 +106,9 @@ func handleHrefDoesNotExist(href AnchorTag) {
 	anchorTagsWithoutHrefMutex.mu.Lock()
 	anchorTagsWithoutHrefMutex.Tags = append(anchorTagsWithoutHrefMutex.Tags, href)
 	anchorTagsWithoutHrefMutex.mu.Unlock()
+	color.Set(color.FgRed)
 	fmt.Println("No href on <a>, found on: ", href.FoundOn)
+	color.Unset()
 }
 
 func handleExternalHref(url string) {

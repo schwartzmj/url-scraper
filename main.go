@@ -131,4 +131,5 @@ func saveAndPrintResults() {
 	fmt.Println("<a> without href: ", len(anchorTagsWithoutHrefMutex.Tags))
 	fmt.Println("Saved to:", pathToSave)
 	fmt.Println("\033[32m" + "---------------" + "\033[0m")
+	fmt.Println("initialPath", initialPath)
 }
