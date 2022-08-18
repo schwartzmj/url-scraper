@@ -13,26 +13,56 @@ import (
 	"time"
 )
 
+//type InternalPage struct {
+//	Title      string
+//	Url        string
+//	Host       string
+//	Path       string
+//	Scheme     string
+//	Hrefs      []string
+//	StatusCode int
+//	//Redirects  []string // eventually make this an array of Redirect struct itself (from, to, status code)?
+//}
+//
+//type ExternalPage struct {
+//	Url        string
+//	Host       string
+//	Path       string
+//	Scheme     string
+//	StatusCode int
+//}
+
 var initialScheme string
 var initialHost string
 var initialPath string
 
 // make a urlsHandled syncmap
-var urlsHandledMutex = UrlsHandledMutex{urls: make(map[string]bool)}
+var urlsHandledMutex = UrlsHandledMutex{urls: make(map[string]int)}
 
 type UrlsHandledMutex struct {
 	mu   sync.Mutex
-	urls map[string]bool
+	urls map[string]int
 }
 
-type PagesMutex struct {
-	mu    sync.Mutex
-	pages []Page
+type VisitedPage struct {
+	GivenHref  string
+	Url        string
+	StatusCode int
 }
 
-var pagesMutex = PagesMutex{}
+type PagesVisitedMutex struct {
+	mu           sync.Mutex
+	VisitedPages []VisitedPage
+}
 
-var wg = sync.WaitGroup{}
+type AnchorTagsWithoutHrefMutex struct {
+	mu   sync.Mutex
+	Tags []AnchorTag
+}
+
+var internalPagesVisitedMutex = PagesVisitedMutex{}
+var externalPagesVisitedMutex = PagesVisitedMutex{}
+var anchorTagsWithoutHrefMutex = AnchorTagsWithoutHrefMutex{}
 
 func main() {
 	start := time.Now()
@@ -40,6 +70,18 @@ func main() {
 		fmt.Println("Time taken total:", time.Since(start))
 	}()
 
+	// TODO: maybe this should return `initialUrl, err` instead of storing these globally?
+	baseUrl, err := handleArgs()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	initiateCrawl(baseUrl)
+
+	saveAndPrintResults()
+}
+
+func handleArgs() (string, error) {
 	baseUrlPtr := flag.String("url", "", "Base URL to crawl")
 	flag.Parse()
 
@@ -51,25 +93,21 @@ func main() {
 		log.Fatal("Base URL must be absolute")
 	}
 
-	if (len(baseUrl.String()) == 0) {
+	if len(baseUrl.String()) == 0 {
 		log.Fatal("Please provide a base URL to crawl")
 	}
 
 	initialScheme = baseUrl.Scheme
 	initialHost = baseUrl.Host
 	initialPath = baseUrl.Path
+	return baseUrl.String(), nil
+}
 
-	// Initiate recursive crawl
-	wg.Add(1)
-	crawl(baseUrl.String())
-	firstPageCrawledTime := time.Now()
-	defer func() {
-		fmt.Println("Time taken after first page:", time.Since(firstPageCrawledTime))
-	}()
-
-	wg.Wait()
-
-	file, _ := json.MarshalIndent(pagesMutex.pages, "", " ")
+func saveAndPrintResults() {
+	toSave := make(map[string]interface{})
+	toSave["internalPages"] = internalPagesVisitedMutex.VisitedPages
+	toSave["externalPages"] = externalPagesVisitedMutex.VisitedPages
+	file, _ := json.MarshalIndent(toSave, "", " ")
 
 	ex, err := os.Getwd()
 	if err != nil {
@@ -84,39 +122,9 @@ func main() {
 	}
 
 	fmt.Println("\033[32m" + "---------------" + "\033[0m")
-	fmt.Println("Completed! Number of pages visited: ", len(pagesMutex.pages))
+	fmt.Println("Completed! Number of pages visited:")
+	fmt.Println("Internal: ", len(internalPagesVisitedMutex.VisitedPages))
+	fmt.Println("External: ", len(externalPagesVisitedMutex.VisitedPages))
 	fmt.Println("Saved to:", pathToSave)
 	fmt.Println("\033[32m" + "---------------" + "\033[0m")
-}
-
-func crawl(url string) {
-	// Note we wg.Add(1) before the very first call of this function (done in main())
-	defer wg.Done()
-
-	getPageResult := get(url)
-
-	if getPageResult.Err != nil {
-		fmt.Println(getPageResult.Err)
-		return
-	}
-	// if page is empty, then we have already visited this page and we should return
-	if getPageResult.Skipped {
-		return
-	}
-
-	// add the page to the pages slice
-	pagesMutex.mu.Lock()
-	pagesMutex.pages = append(pagesMutex.pages, getPageResult.Page)
-	pagesMutex.mu.Unlock()
-
-	// if getPageResult.Page.StatusCode != http.StatusOK ||  {
-	// 	fmt.Println("Error. Status code:", getPageResult.Page.StatusCode)
-	// 	return
-	// }
-
-	// For each getPageResult.Page.Links, call crawl on each link concurrently
-	for _, link := range getPageResult.Page.Links {
-		wg.Add(1)
-		go crawl(link)
-	}
 }
