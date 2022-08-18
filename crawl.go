@@ -90,7 +90,7 @@ func markHrefAsHandled(u *url.URL) bool {
 func handleHrefDoesNotExist(href AnchorTag) {
 	anchorTagsWithoutHrefMutex.mu.Lock()
 	anchorTagsWithoutHrefMutex.Tags = append(anchorTagsWithoutHrefMutex.Tags, href)
-	externalPagesVisitedMutex.mu.Unlock()
+	anchorTagsWithoutHrefMutex.mu.Unlock()
 	fmt.Println("No href on <a>, found on: ", href.FoundOn)
 }
 

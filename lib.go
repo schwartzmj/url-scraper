@@ -80,6 +80,7 @@ func getAndCrawlHref(href string) {
 		StatusCode: resp.StatusCode,
 	})
 	internalPagesVisitedMutex.mu.Unlock()
+
 	color.Set(color.FgCyan)
 	fmt.Println(resp.StatusCode, resp.Request.URL.String())
 	color.Unset()
