@@ -82,7 +82,7 @@ func getAndCrawlHref(href string) {
 	internalPagesVisitedMutex.mu.Unlock()
 
 	color.Set(color.FgCyan)
-	fmt.Println(resp.StatusCode, resp.Request.URL.String())
+	fmt.Println(resp.StatusCode, resp.Request.URL.Path)
 	color.Unset()
 
 	anchorTags := getAnchorTagsAndHrefAttribute(doc, resp.Request.URL.String())
