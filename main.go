@@ -78,7 +78,7 @@ func main() {
 	initiateCrawl(baseUrl)
 
 	wg.Wait()
-	saveAndPrintResults()
+	saveAndPrintResults(baseUrl)
 }
 
 func handleArgs() (string, error) {
@@ -103,7 +103,7 @@ func handleArgs() (string, error) {
 	return baseUrl.String(), nil
 }
 
-func saveAndPrintResults() {
+func saveAndPrintResults(baseUrl string) {
 	toSave := make(map[string]interface{})
 	toSave["anchorTagsWithoutHref"] = anchorTagsWithoutHrefMutex.Tags
 	toSave["internalPages"] = internalPagesVisitedMutex.VisitedPages
@@ -125,11 +125,10 @@ func saveAndPrintResults() {
 	}
 
 	fmt.Println("\033[32m" + "---------------" + "\033[0m")
-	fmt.Println("Completed! Number of pages visited:")
+	fmt.Println("Completed! Number of pages visited for " + baseUrl + ":")
 	fmt.Println("Internal: ", len(internalPagesVisitedMutex.VisitedPages))
 	fmt.Println("External: ", len(externalPagesVisitedMutex.VisitedPages))
 	fmt.Println("<a> without href: ", len(anchorTagsWithoutHrefMutex.Tags))
 	fmt.Println("Saved to:", pathToSave)
 	fmt.Println("\033[32m" + "---------------" + "\033[0m")
-	fmt.Println("initialPath", initialPath)
 }
