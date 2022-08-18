@@ -117,6 +117,6 @@ func handleExternalHref(url string) {
 	externalPagesVisitedMutex.mu.Unlock()
 
 	color.Set(color.FgWhite)
-	fmt.Println("External: ", resp.StatusCode, resp.Request.URL.String())
+	fmt.Println(resp.StatusCode, resp.Request.URL.String())
 	color.Unset()
 }

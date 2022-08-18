@@ -81,7 +81,7 @@ func getAndCrawlHref(href string) {
 	})
 	internalPagesVisitedMutex.mu.Unlock()
 	color.Set(color.FgCyan)
-	fmt.Println("Internal: ", resp.StatusCode, resp.Request.URL.String())
+	fmt.Println(resp.StatusCode, resp.Request.URL.String())
 	color.Unset()
 
 	anchorTags := getAnchorTagsAndHrefAttribute(doc, href)
