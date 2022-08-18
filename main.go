@@ -105,8 +105,11 @@ func handleArgs() (string, error) {
 
 func saveAndPrintResults() {
 	toSave := make(map[string]interface{})
+	toSave["anchorTagsWithoutHref"] = anchorTagsWithoutHrefMutex.Tags
 	toSave["internalPages"] = internalPagesVisitedMutex.VisitedPages
 	toSave["externalPages"] = externalPagesVisitedMutex.VisitedPages
+	toSave["urlsHandled"] = urlsHandledMutex.urls
+
 	file, _ := json.MarshalIndent(toSave, "", " ")
 
 	ex, err := os.Getwd()
@@ -125,6 +128,7 @@ func saveAndPrintResults() {
 	fmt.Println("Completed! Number of pages visited:")
 	fmt.Println("Internal: ", len(internalPagesVisitedMutex.VisitedPages))
 	fmt.Println("External: ", len(externalPagesVisitedMutex.VisitedPages))
+	fmt.Println("<a> without href: ", len(anchorTagsWithoutHrefMutex.Tags))
 	fmt.Println("Saved to:", pathToSave)
 	fmt.Println("\033[32m" + "---------------" + "\033[0m")
 }

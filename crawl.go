@@ -95,8 +95,6 @@ func handleHrefDoesNotExist(href AnchorTag) {
 }
 
 func handleExternalHref(url string) {
-	defer wg.Done()
-
 	resp, err := getHref(url)
 	if err != nil {
 		fmt.Println(err)
