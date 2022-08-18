@@ -65,11 +65,10 @@ var externalPagesVisitedMutex = PagesVisitedMutex{}
 var anchorTagsWithoutHrefMutex = AnchorTagsWithoutHrefMutex{}
 
 func main() {
-	start := time.Now()
+	startTime := time.Now()
 	defer func() {
-		fmt.Println("Time taken total:", time.Since(start))
+		fmt.Println("Time taken total:", time.Since(startTime))
 	}()
-
 	// TODO: maybe this should return `initialUrl, err` instead of storing these globally?
 	baseUrl, err := handleArgs()
 	if err != nil {
@@ -78,6 +77,7 @@ func main() {
 
 	initiateCrawl(baseUrl)
 
+	wg.Wait()
 	saveAndPrintResults()
 }
 

@@ -6,18 +6,12 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 )
 
 var wg = sync.WaitGroup{}
 
 func initiateCrawl(url string) {
-	firstPageCrawledTime := time.Now()
-	defer func() {
-		fmt.Println("Time taken after first page:", time.Since(firstPageCrawledTime))
-	}()
 	getAndCrawlHref(url)
-	wg.Wait()
 }
 
 func handleHrefs(hrefs []AnchorTag) {
