@@ -109,6 +109,9 @@ func getAnchorTagsAndHrefAttribute(doc *goquery.Document, currentUrl string) []A
 		if !exists {
 			// get the inner text for the anchor tag if it doesn't have an href attribute, so user can find it easier
 			innerText = strings.TrimSpace(s.Text())
+			if len(innerText) > 50 {
+				innerText = innerText[:50] + "..."
+			}
 		}
 
 		anchorTags = append(anchorTags, AnchorTag{HrefValue: href, HrefExists: exists, InnerTextForNonExistentHref: innerText, FoundOn: currentUrl})
