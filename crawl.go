@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/fatih/color"
 )
 
 var wg = sync.WaitGroup{}
@@ -56,9 +59,8 @@ func handleHrefs(hrefs []AnchorTag) {
 		if !isHttpBasedHref(u) {
 			continue
 		}
-		//fmt.Println("\033[31m", u.String(), href, "\033[0m")
-		// Now we can kick off the fetching of the href/page, how we do so depends on if it is internal or external.
 
+		// Now we can kick off the fetching of the href/page, how we do so depends on if it is internal or external.
 		isInternal := isInternalHref(u)
 		if isInternal {
 			// Need to do this because u.String() might just be "/something" or "something"
@@ -79,6 +81,7 @@ func handleHrefs(hrefs []AnchorTag) {
 }
 
 // Need to do this because u.String() might just be "/something" or "something"
+// TODO: can probably use u.ResolveReference for this? Would need to parse the base scheme and host as a *url.URL
 func actualUrlToGet(u *url.URL) string {
 	if u.Scheme == "http" || u.Scheme == "https" {
 		return u.String()
@@ -89,8 +92,8 @@ func actualUrlToGet(u *url.URL) string {
 	return initialScheme + "://" + initialHost + "/" + u.String()
 }
 
+// Mark the href as handled
 func markHrefAsHandled(u *url.URL) bool {
-	// Mark the href as handled
 	urlsHandledMutex.mu.Lock()
 	defer urlsHandledMutex.mu.Unlock()
 
@@ -128,4 +131,7 @@ func handleExternalHref(url string) {
 	color.Set(color.FgWhite)
 	fmt.Println(resp.StatusCode, resp.Request.URL.String())
 	color.Unset()
+
+	io.Copy(ioutil.Discard, resp.Body)
+	resp.Body.Close()
 }

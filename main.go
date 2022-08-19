@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
@@ -38,27 +37,6 @@ var initialPath string
 
 // make a urlsHandled syncmap
 var urlsHandledMutex = UrlsHandledMutex{urls: make(map[string]int)}
-
-type UrlsHandledMutex struct {
-	mu   sync.Mutex
-	urls map[string]int
-}
-
-type VisitedPage struct {
-	GivenHref  string
-	Url        string
-	StatusCode int
-}
-
-type PagesVisitedMutex struct {
-	mu           sync.Mutex
-	VisitedPages []VisitedPage
-}
-
-type AnchorTagsWithoutHrefMutex struct {
-	mu   sync.Mutex
-	Tags []AnchorTag
-}
 
 var internalPagesVisitedMutex = PagesVisitedMutex{}
 var externalPagesVisitedMutex = PagesVisitedMutex{}

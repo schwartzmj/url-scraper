@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/fatih/color"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/fatih/color"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -89,14 +92,8 @@ func getAndCrawlHref(href string) {
 
 	handleHrefs(anchorTags)
 	// TODO: why can I not use defer at the top? Seems like resp.Body does not exist anymore if I use defer at the top.
+	io.Copy(ioutil.Discard, resp.Body)
 	resp.Body.Close()
-}
-
-type AnchorTag struct {
-	HrefValue                   string
-	HrefExists                  bool
-	InnerTextForNonExistentHref string
-	FoundOn                     string
 }
 
 // getLinks gets all anchor tag hrefs from the page and returns an array of each href value
