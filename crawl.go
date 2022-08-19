@@ -64,10 +64,10 @@ func handleHrefs(hrefs []AnchorTag) {
 		isInternal := isInternalHref(u)
 		if isInternal {
 			// Need to do this because u.String() might just be "/something" or "something"
-			actualUrlToGet := actualUrlToGet(u)
+			actualInternalUrlToGet := actualInternalUrlToGet(u)
 			wg.Add(1)
 			go func() {
-				getAndCrawlHref(actualUrlToGet)
+				getAndCrawlHref(actualInternalUrlToGet)
 				wg.Done()
 			}()
 		} else {
@@ -82,7 +82,7 @@ func handleHrefs(hrefs []AnchorTag) {
 
 // Need to do this because u.String() might just be "/something" or "something"
 // TODO: can probably use u.ResolveReference for this? Would need to parse the base scheme and host as a *url.URL
-func actualUrlToGet(u *url.URL) string {
+func actualInternalUrlToGet(u *url.URL) string {
 	if u.Scheme == "http" || u.Scheme == "https" {
 		return u.String()
 	}
@@ -115,6 +115,11 @@ func handleHrefDoesNotExist(href AnchorTag) {
 }
 
 func handleExternalHref(url string) {
+
+	if strings.HasPrefix(url, "//") {
+		url = initialScheme + ":" + url
+	}
+
 	resp, err := getHref(url)
 	if err != nil {
 		fmt.Println(err)
