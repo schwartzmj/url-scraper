@@ -48,10 +48,7 @@ func main() {
 		fmt.Println("Time taken total:", time.Since(startTime))
 	}()
 	// TODO: maybe this should return `initialUrl, err` instead of storing these globally?
-	baseUrl, err := handleArgs()
-	if err != nil {
-		log.Fatal(err)
-	}
+	baseUrl := handleArgs()
 
 	initiateCrawl(baseUrl)
 
@@ -59,7 +56,7 @@ func main() {
 	saveAndPrintResults(baseUrl)
 }
 
-func handleArgs() (string, error) {
+func handleArgs() string {
 	baseUrlPtr := flag.String("url", "", "Base URL to crawl")
 	flag.Parse()
 
@@ -78,7 +75,7 @@ func handleArgs() (string, error) {
 	initialScheme = baseUrl.Scheme
 	initialHost = baseUrl.Host
 	initialPath = baseUrl.Path
-	return baseUrl.String(), nil
+	return baseUrl.String()
 }
 
 func saveAndPrintResults(baseUrl string) {
