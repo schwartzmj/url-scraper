@@ -60,6 +60,14 @@ func handleArgs() string {
 	baseUrlPtr := flag.String("url", "", "Base URL to crawl")
 	flag.Parse()
 
+	// If no URL is provided via flags, prompt the user for one.
+	if *baseUrlPtr == "" {
+		fmt.Println("No URL provided. Please enter a base URL to crawl:")
+		if _, err := fmt.Scanln(baseUrlPtr); err != nil {
+			log.Fatal("Failed to read URL from input:", err)
+		}
+	}
+
 	baseUrl, err := url.Parse(*baseUrlPtr)
 	if err != nil {
 		log.Fatal(err)
